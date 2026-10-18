@@ -1,26 +1,111 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 0.75rem;
+  /* Warm Archival Parchment & Deep Obsidian Ink */
+  --background: #f6f2e9;
+  --foreground: #14120f;
+  --card: #fdfbf7;
+  --card-foreground: #14120f;
+  --popover: #fdfbf7;
+  --popover-foreground: #14120f;
+  /* Crimson Judicial Seal */
+  --primary: #b82921;
+  --primary-foreground: #fdfbf7;
+  /* Warm Legal Ledger Stone */
+  --secondary: #ebe4d5;
+  --secondary-foreground: #1f1c17;
+  --muted: #efe9dc;
+  --muted-foreground: #665e52;
+  --accent: #e5dcc8;
+  --accent-foreground: #14120f;
+  --destructive: #991b1b;
+  --border: #d8cfbe;
+  --input: #d8cfbe;
+  --ring: #b82921;
+}
+
+.dark {
+  --background: #11100e;
+  --foreground: #f4efe4;
+  --card: #1a1814;
+  --card-foreground: #f4efe4;
+  --popover: #1a1814;
+  --popover-foreground: #f4efe4;
+  --primary: #d94138;
+  --primary-foreground: #ffffff;
+  --secondary: #26231d;
+  --secondary-foreground: #f4efe4;
+  --muted: #221f1a;
+  --muted-foreground: #9e9585;
+  --accent: #2c2821;
+  --accent-foreground: #f4efe4;
+  --destructive: #dc2626;
+  --border: #302b23;
+  --input: #302b23;
+  --ring: #d94138;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: radial-gradient(
+      rgba(184, 41, 33, 0.04) 1px,
+      transparent 0
+    );
+    background-size: 24px 24px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes stamp-slam {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-8deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.95) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-3deg);
+  }
+}
+
+.animate-stamp {
+  animation: stamp-slam 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
