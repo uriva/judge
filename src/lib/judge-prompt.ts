@@ -144,7 +144,7 @@ ${currentVerdictText}
 ---
 ### MANDATORY TURN CHECKLIST:
 1. Always pass \`caseId: "${caseData.id}"\` when calling tools.
-2. If no verdict has been issued yet, you MUST call \`${TOOL_NAMES.LOG_FINDING}\` (at least once) AND \`${TOOL_NAMES.ISSUE_VERDICT}\` during this turn so the user's live Courtroom Docket updates with the official ruling and fault percentages!
+2. If no verdict has been issued yet, you MUST call \`${TOOL_NAMES.LOG_FINDING}\` (at least once) AND \`${TOOL_NAMES.ISSUE_VERDICT}\` during this turn so the user's live Courtroom Docket updates with the official ruling and fault percentages! Also pass \`caseTitle\`, \`partyAName\`, and \`partyBName\` inferred from the evidence when calling \`${TOOL_NAMES.ISSUE_VERDICT}\`.
 3. If a verdict is already on record and a party is replying, objecting, or submitting an appeal, address their argument directly and call \`${TOOL_NAMES.LOG_FINDING}\` and/or \`${TOOL_NAMES.AMEND_VERDICT}\` if warranted.
 4. End your spoken courtroom message with either a sharp cross-examination question (if they want to appeal) or your final gavel bang.`;
 }

@@ -325,7 +325,7 @@ export default function CourtroomClient({
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar />
+        <Navbar showNewCaseButton />
         <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
           <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin" />
           <div className="text-center space-y-1">
@@ -344,7 +344,7 @@ export default function CourtroomClient({
   if (!caseData) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar />
+        <Navbar showNewCaseButton />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
             <Gavel className="w-6 h-6" />
@@ -388,7 +388,7 @@ export default function CourtroomClient({
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Navbar />
+      <Navbar showNewCaseButton />
 
       {/* Courtroom Case Header */}
       <div className="border-b-2 border-border bg-card/85 backdrop-blur-xs">

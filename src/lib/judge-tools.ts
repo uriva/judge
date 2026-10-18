@@ -115,6 +115,21 @@ export const getJudgeTools = (baseUrl: string): RemoteTool[] => [
           type: "string",
           description: "The unique ID of the case from the ACTIVE CASE FILE.",
         },
+        caseTitle: {
+          type: "string",
+          description:
+            "A concise, memorable official title for this case inferred from the dispute (e.g. 'The $840 Birthday Dinner Split' or 'The Double-Parked Mazda').",
+        },
+        partyAName: {
+          type: "string",
+          description:
+            "Inferred name or role of Party A from the chat/photo (e.g. 'Maya' or 'The Roommate').",
+        },
+        partyBName: {
+          type: "string",
+          description:
+            "Inferred name or role of Party B from the chat/photo (e.g. 'Liam' or 'The Driver').",
+        },
         verdictWinner: {
           type: "string",
           description:
@@ -173,6 +188,21 @@ export const getJudgeTools = (baseUrl: string): RemoteTool[] => [
         caseId: {
           type: "string",
           description: "The unique ID of the case from the ACTIVE CASE FILE.",
+        },
+        caseTitle: {
+          type: "string",
+          description:
+            "A concise, memorable official title for this case inferred from the dispute (e.g. 'The $840 Birthday Dinner Split' or 'The Double-Parked Mazda').",
+        },
+        partyAName: {
+          type: "string",
+          description:
+            "Inferred name or role of Party A from the chat/photo (e.g. 'Maya' or 'The Roommate').",
+        },
+        partyBName: {
+          type: "string",
+          description:
+            "Inferred name or role of Party B from the chat/photo (e.g. 'Liam' or 'The Driver').",
         },
         verdictWinner: {
           type: "string",

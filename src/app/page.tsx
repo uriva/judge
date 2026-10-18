@@ -17,72 +17,24 @@ import {
 } from "@/lib/alice-and-bot";
 import { getLocalCaseIds, saveLocalCaseId } from "@/lib/case-storage";
 import { Navbar } from "@/components/Navbar";
-import { WhatsAppTranscriptView } from "@/components/WhatsAppTranscriptView";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Gavel,
-  Scale,
-  Upload,
-  Sparkles,
-  MessageSquareQuote,
-  Camera,
+  ImagePlus,
   ArrowRight,
-  Flame,
-  Receipt,
-  HeartCrack,
-  CheckCircle2,
   X,
-  Globe,
-  ShieldCheck,
-  Quote,
 } from "lucide-react";
-
-const PERSONA_OPTIONS = [
-  {
-    id: "supreme" as const,
-    name: "Supreme Arbitrator",
-    tagline: "Objective, razor-sharp, cites logic & social contract",
-    icon: Scale,
-  },
-  {
-    id: "small_claims" as const,
-    name: "Small Claims & Receipts",
-    tagline: "Exact dollar splits, contracts & financial math",
-    icon: Receipt,
-  },
-  {
-    id: "relationship" as const,
-    name: "Relationship Tribunal",
-    tagline: "Roommates, dating, boundaries & texting tone",
-    icon: HeartCrack,
-  },
-  {
-    id: "roast" as const,
-    name: "Roast Court (No Mercy)",
-    tagline: "Brutally funny ruling that calls out delusion",
-    icon: Flame,
-  },
-];
 
 export default function HomePage() {
   const router = useRouter();
 
-  // Intake Console State
-  const [correspondence, setCorrespondence] = useState("");
-  const [summaryQuestion, setSummaryQuestion] = useState("");
-  const [caseTitle, setCaseTitle] = useState("");
-  const [partyA, setPartyA] = useState("");
-  const [partyB, setPartyB] = useState("");
-  const [persona, setPersona] = useState<
-    "supreme" | "small_claims" | "relationship" | "roast"
-  >("supreme");
+  // Single unified input state
+  const [inputText, setInputText] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageCaption, setImageCaption] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStep, setSubmitStep] = useState("");
 
@@ -91,21 +43,25 @@ export default function HomePage() {
   const [myCases, setMyCases] = useState<CaseRecord[]>([]);
   const [loadingDocket, setLoadingDocket] = useState(true);
 
-  // Live parse WhatsApp correspondence
   const parsedPreview = useMemo(
-    () => parseWhatsAppCorrespondence(correspondence),
-    [correspondence]
+    () => parseWhatsAppCorrespondence(inputText),
+    [inputText]
   );
 
-  // Auto-populate Party A and Party B when speakers are detected in pasted WhatsApp text
-  useEffect(() => {
-    if (parsedPreview.speakers.length >= 1 && !partyA) {
-      setPartyA(parsedPreview.speakers[0]);
+  const attachFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please attach an image or screenshot.");
+      return;
     }
-    if (parsedPreview.speakers.length >= 2 && !partyB) {
-      setPartyB(parsedPreview.speakers[1]);
-    }
-  }, [parsedPreview.speakers, partyA, partyB]);
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setImageDataUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Global paste listener for screenshots (Ctrl+V)
   useEffect(() => {
@@ -116,15 +72,8 @@ export default function HomePage() {
         if (item.type.startsWith("image/")) {
           const file = item.getAsFile();
           if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (typeof reader.result === "string") {
-                setImageDataUrl(reader.result);
-                toast.success("Screenshot pasted into Evidence Locker!");
-              }
-            };
-            reader.readAsDataURL(file);
+            attachFile(file);
+            toast.success("Screenshot attached!");
           }
         }
       }
@@ -149,75 +98,65 @@ export default function HomePage() {
   }, []);
 
   const handleLoadSample = (sample: SampleCasePreset) => {
-    setCorrespondence(sample.correspondence);
-    setSummaryQuestion(sample.contextNote);
-    setCaseTitle(sample.title);
-    setPartyA(sample.partyA);
-    setPartyB(sample.partyB);
-    setPersona(sample.persona);
-    toast.info(`Loaded sample case: "${sample.label}"`);
+    setInputText(`${sample.correspondence}\n\n${sample.contextNote}`);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setImageDataUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    if (file) attachFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) attachFile(file);
   };
 
   const handleSummonJudge = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!correspondence.trim() && !imageDataUrl && !summaryQuestion.trim()) {
-      toast.error(
-        "Paste a WhatsApp correspondence, upload a photo/screenshot, or describe the dispute first!"
-      );
+    if (!inputText.trim() && !imageDataUrl) {
+      toast.error("Paste a WhatsApp chat, describe the dispute, or drop a screenshot first.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const effectivePartyA =
-        partyA.trim() || parsedPreview.speakers[0] || "Party A";
-      const effectivePartyB =
-        partyB.trim() || parsedPreview.speakers[1] || "Party B";
+      const effectivePartyA = parsedPreview.speakers[0] || "Party A";
+      const effectivePartyB = parsedPreview.speakers[1] || "Party B";
 
-      setSubmitStep("Swearing in your courtroom identity...");
+      const autoTitle =
+        parsedPreview.speakers.length >= 2
+          ? `${effectivePartyA} v. ${effectivePartyB}`
+          : inputText.trim()
+          ? inputText.trim().split("\n")[0].slice(0, 60)
+          : "Visual Evidence Dispute";
+
+      setSubmitStep("Opening courtroom...");
       const creds = await ensureAliceIdentity(effectivePartyA);
 
-      setSubmitStep("Filing exhibits onto the official docket...");
       const createRes = await fetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:
-            caseTitle.trim() ||
-            (summaryQuestion.trim()
-              ? summaryQuestion.trim().slice(0, 65)
-              : `${effectivePartyA} v. ${effectivePartyB}`),
+          title: autoTitle,
           summary:
-            summaryQuestion.trim() ||
-            `Determine who is in the right between ${effectivePartyA} and ${effectivePartyB} based on the submitted evidence.`,
-          category: imageDataUrl && !correspondence.trim() ? "screenshot" : "whatsapp",
-          judgePersona: persona,
-          rawCorrespondence: correspondence.trim() || undefined,
+            inputText.trim().slice(0, 280) ||
+            "Analyze the attached visual evidence and issue a decisive verdict.",
+          category: imageDataUrl && !inputText.trim() ? "screenshot" : "whatsapp",
+          judgePersona: "supreme",
+          rawCorrespondence: inputText.trim() || undefined,
           partyAName: effectivePartyA,
           partyBName: effectivePartyB,
           submitterRole: effectivePartyA,
           imageDataUrl: imageDataUrl || undefined,
-          imageCaption: imageCaption.trim() || undefined,
-          isPublic,
+          isPublic: true,
           publicSignKey: creds.publicSignKey,
         }),
       });
 
       if (!createRes.ok) {
-        throw new Error("Failed to register case on docket");
+        throw new Error("Failed to register case");
       }
 
       const { case: createdCase } = (await createRes.json()) as {
@@ -225,7 +164,7 @@ export default function HomePage() {
       };
       saveLocalCaseId(createdCase.id);
 
-      setSubmitStep("Opening encrypted courtroom channel with The Judge...");
+      setSubmitStep("Summoning The Judge...");
       const convRes = await createCaseConversation({
         caseNumber: createdCase.caseNumber,
         title: createdCase.title,
@@ -234,7 +173,6 @@ export default function HomePage() {
       });
 
       if ("conversationId" in convRes && convRes.conversationId) {
-        // Link conversationId in Postgres BEFORE sending the first message so remote_config has full context!
         await fetch(`/api/cases/${createdCase.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -245,28 +183,16 @@ export default function HomePage() {
           }),
         });
 
-        setSubmitStep("Delivering WhatsApp transcript & exhibits to the Bench...");
         const briefLines = [
-          `⚖️ **OFFICIAL CASE FILING — ${createdCase.caseNumber}**`,
-          `**Case:** ${createdCase.title} (${createdCase.partyAName} v. ${createdCase.partyBName})`,
-          `**Filed by:** ${createdCase.submitterRole}`,
-          `**Question Before the Court:** ${createdCase.summary}`,
+          `⚖️ **CASE ${createdCase.caseNumber}**`,
         ];
         if (createdCase.rawCorrespondence) {
           briefLines.push(
-            `\n**Submitted WhatsApp / Text Correspondence:**\n\`\`\`\n${createdCase.rawCorrespondence.slice(
-              0,
-              3500
-            )}\n\`\`\``
-          );
-        }
-        if (createdCase.imageCaption) {
-          briefLines.push(
-            `\n**Visual Evidence Note:** ${createdCase.imageCaption}`
+            `\n\`\`\`\n${createdCase.rawCorrespondence.slice(0, 3500)}\n\`\`\``
           );
         }
         briefLines.push(
-          `\nYour Honor, please analyze the evidence, log key findings of fact, and issue your official verdict and fault split.`
+          `\nYour Honor, analyze this evidence, log your findings of fact, and issue your official verdict and fault split.`
         );
 
         await sendOpeningCaseBrief({
@@ -288,306 +214,133 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Navbar
-        onNewCaseClick={() => {
-          document
-            .getElementById("file-case")
-            ?.scrollIntoView({ behavior: "smooth" });
-        }}
-      />
+      <Navbar />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        {/* Hero Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-4 mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary/10 border border-primary/25 text-primary font-mono text-[11px] uppercase tracking-widest font-bold">
-            <Gavel className="w-3.5 h-3.5" />
-            <span>The People&apos;s AI Tribunal • Court is in Session</span>
-          </div>
-
-          <h1 className="font-serif text-4xl sm:text-6xl font-extrabold tracking-tight text-foreground leading-[1.08]">
+      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-10 sm:py-16">
+        {/* Clean, focused hero */}
+        <div className="text-center space-y-3 mb-8">
+          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground leading-[1.1]">
             Paste the WhatsApp chat.{" "}
             <span className="italic font-normal text-primary">
-              Drop the photo.
-            </span>{" "}
-            Get an official verdict.
+              Get a verdict.
+            </span>
           </h1>
-
-          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Done arguing in circles? Submit your raw WhatsApp correspondence, a screenshot, or a photo of the crime scene. The Honorable AI Judge dissects the timestamps, fact-checks external claims on the web, assigns exact fault percentages, and issues a shareable Verdict Card.
+          <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
+            Paste a conversation, describe the argument, or drop a screenshot. The AI Judge analyzes the receipts and rules who is at fault.
           </p>
         </div>
 
-        {/* Immediate Evidence Filing Console */}
-        <section
-          id="file-case"
-          className="max-w-4xl mx-auto rounded-3xl bg-card border-2 border-border shadow-md overflow-hidden"
+        {/* Single Unified Composer */}
+        <form
+          onSubmit={handleSummonJudge}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-2xl bg-card border-2 transition-all shadow-sm overflow-hidden ${
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-border focus-within:border-primary/60"
+          }`}
         >
-          {/* Console Top Bar + Sample Case Presets */}
-          <div className="bg-secondary/70 border-b border-border px-5 sm:px-7 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-              <span className="font-mono text-xs uppercase tracking-wider font-bold text-foreground">
-                Official Evidence Intake Desk
-              </span>
-            </div>
+          <div className="p-4 sm:p-5 space-y-3">
+            <Textarea
+              placeholder={`Paste WhatsApp messages, explain the dispute, or press Ctrl+V to paste a screenshot...\n\n[10/18/26, 11:42 PM] Liam: Total for dinner was $840, so $120 each!\n[10/18/26, 11:44 PM] Maya: Wait I only had a $22 salad and tap water...`}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              rows={6}
+              className="border-0 shadow-none focus-visible:ring-0 p-0 resize-none font-mono text-xs sm:text-sm bg-transparent leading-relaxed"
+            />
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-mono text-muted-foreground mr-1">
-                Try a sample dispute:
-              </span>
-              {SAMPLE_CASE_PRESETS.map((sample) => (
+            {/* Attached Image Preview Chip */}
+            {imageDataUrl && (
+              <div className="inline-flex items-center gap-3 p-2 pr-3 rounded-xl bg-secondary/70 border border-border">
+                <img
+                  src={imageDataUrl}
+                  alt="Attached evidence"
+                  className="h-14 w-14 rounded-lg object-cover border border-border"
+                />
+                <div className="text-xs">
+                  <p className="font-medium text-foreground">Photo Exhibit Attached</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Ready for judicial inspection
+                  </p>
+                </div>
                 <button
-                  key={sample.label}
                   type="button"
-                  onClick={() => handleLoadSample(sample)}
-                  className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-card hover:bg-primary hover:text-primary-foreground border border-border transition-colors cursor-pointer"
+                  onClick={() => {
+                    setImageDataUrl(null);
+                    setImageFile(null);
+                  }}
+                  className="ml-1 p-1 rounded-full hover:bg-background text-muted-foreground hover:text-foreground"
                 >
-                  {sample.label}
+                  <X className="w-4 h-4" />
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleSummonJudge} className="p-5 sm:p-7 space-y-6">
-            {/* Step 1: WhatsApp Correspondence OR Photo Upload */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* Left 7 cols: Paste WhatsApp Chat */}
-              <div className="lg:col-span-7 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-mono uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-                    <MessageSquareQuote className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                    <span>1. Paste WhatsApp / Chat Correspondence</span>
-                  </label>
-                  {parsedPreview.messages.length > 0 && (
-                    <Badge
-                      variant="outline"
-                      className="font-mono text-[10px] bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/30"
-                    >
-                      ✓ {parsedPreview.messages.length} messages •{" "}
-                      {parsedPreview.speakers.length} speakers detected
-                    </Badge>
-                  )}
-                </div>
-
-                <Textarea
-                  placeholder={`Paste copied WhatsApp messages here...\nExample:\n[10/18/26, 2:14 PM] Maya: You said you'd split the Uber!!\n[10/18/26, 2:15 PM] Liam: I said if we left before midnight!`}
-                  value={correspondence}
-                  onChange={(e) => setCorrespondence(e.target.value)}
-                  rows={6}
-                  className="font-mono text-xs bg-background/70 border-border leading-relaxed"
-                />
-
-                {/* Live Parsed WhatsApp Bubble Preview */}
-                {parsedPreview.isStructuredChat && (
-                  <div className="pt-1">
-                    <WhatsAppTranscriptView
-                      messages={parsedPreview.messages}
-                      partyAName={partyA || parsedPreview.speakers[0]}
-                      maxHeightClass="max-h-44"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Right 5 cols: Drop Photo / Screenshot */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-2">
-                <label className="text-xs font-mono uppercase tracking-wider font-bold text-foreground flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-primary" />
-                  <span>2. Or Drop a Photo / Screenshot (Ctrl+V)</span>
-                </label>
-
-                {!imageDataUrl ? (
-                  <label className="flex-1 min-h-[148px] rounded-2xl border-2 border-dashed border-border hover:border-primary/60 bg-background/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center p-4 text-center cursor-pointer gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-primary">
-                      <Upload className="w-5 h-5" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-semibold text-foreground">
-                        Click to upload or press{" "}
-                        <kbd className="px-1.5 py-0.5 rounded bg-secondary font-mono text-[10px]">
-                          Ctrl+V
-                        </kbd>
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        WhatsApp screenshot, receipt, parking job, or messy sink
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                ) : (
-                  <div className="flex-1 rounded-2xl border-2 border-primary/40 bg-background/70 p-3 space-y-2 relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageDataUrl(null);
-                        setImageFile(null);
-                      }}
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                    <img
-                      src={imageDataUrl}
-                      alt="Uploaded Evidence Preview"
-                      className="max-h-32 mx-auto rounded-lg object-contain"
-                    />
-                    <Input
-                      placeholder="Caption this photo (e.g. 'How he left the kitchen')"
-                      value={imageCaption}
-                      onChange={(e) => setImageCaption(e.target.value)}
-                      className="h-8 text-xs bg-card"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Step 2: Parties & The Core Question */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                  Party A (Petitioner / You)
-                </label>
-                <Input
-                  placeholder="e.g. Maya"
-                  value={partyA}
-                  onChange={(e) => setPartyA(e.target.value)}
-                  className="h-9 text-xs bg-background/70"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                  Party B (Counterparty)
-                </label>
-                <Input
-                  placeholder="e.g. Liam"
-                  value={partyB}
-                  onChange={(e) => setPartyB(e.target.value)}
-                  className="h-9 text-xs bg-background/70"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-mono uppercase text-muted-foreground font-semibold">
-                  What is the question for the Judge?
-                </label>
-                <Input
-                  placeholder="e.g. Should I pay $120 or $43?"
-                  value={summaryQuestion}
-                  onChange={(e) => setSummaryQuestion(e.target.value)}
-                  className="h-9 text-xs bg-background/70"
-                />
-              </div>
-            </div>
-
-            {/* Step 3: Select Judicial Persona */}
-            <div className="space-y-2">
-              <label className="text-xs font-mono uppercase tracking-wider font-bold text-foreground block">
-                3. Select Judicial Standard
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {PERSONA_OPTIONS.map((opt) => {
-                  const Icon = opt.icon;
-                  const active = persona === opt.id;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setPersona(opt.id)}
-                      className={`text-left p-3 rounded-xl border-2 transition-all cursor-pointer ${
-                        active
-                          ? "border-primary bg-primary/10 shadow-2xs"
-                          : "border-border bg-background/50 hover:border-primary/40"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon
-                          className={`w-4 h-4 ${
-                            active ? "text-primary" : "text-muted-foreground"
-                          }`}
-                        />
-                        <span className="font-serif font-bold text-xs text-foreground">
-                          {opt.name}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        {opt.tagline}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Submit Bar */}
-            <div className="pt-2 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+          {/* Unified Bottom Action Bar */}
+          <div className="px-4 sm:px-5 py-3 bg-secondary/40 border-t border-border flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-card hover:bg-secondary border border-border text-foreground transition-colors">
+                <ImagePlus className="w-4 h-4 text-primary" />
+                <span>{imageDataUrl ? "Change Photo" : "Add Screenshot / Photo"}</span>
                 <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
-                  className="rounded border-border text-primary focus:ring-primary"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
-                <span>
-                  Publish ruling to the Public Court Docket (uncheck for private chamber)
-                </span>
               </label>
 
-              <Button
-                type="submit"
-                size="lg"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto h-12 px-8 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-serif font-bold text-base gap-2.5 shadow-sm cursor-pointer"
-              >
-                <Gavel className="w-5 h-5" />
-                <span>
-                  {isSubmitting
-                    ? submitStep || "Summoning The Judge..."
-                    : "Summon The Judge — Get Verdict"}
+              {parsedPreview.isStructuredChat && (
+                <span className="hidden sm:inline-block font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                  ✓ {parsedPreview.messages.length} messages ({parsedPreview.speakers.slice(0, 2).join(" vs. ")})
                 </span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
+              )}
             </div>
-          </form>
-        </section>
 
-        {/* Assurances / Capabilities Strip */}
-        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-6 pt-6 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            Instant Blame Split (0–100%)
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="h-10 px-6 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-serif font-bold text-sm gap-2 cursor-pointer"
+            >
+              <Gavel className="w-4 h-4" />
+              <span>
+                {isSubmitting ? submitStep || "Summoning..." : "Get Verdict"}
+              </span>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </form>
+
+        {/* Minimal 1-Click Samples */}
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
+          <span className="text-muted-foreground font-mono text-[11px]">
+            Try an example:
           </span>
-          <span className="flex items-center gap-1.5">
-            <Globe className="w-4 h-4 text-primary" />
-            Live Web Fact-Checking & Precedents
-          </span>
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-primary" />
-            Counterparty Summons & Appeal Link
-          </span>
+          {SAMPLE_CASE_PRESETS.map((sample) => (
+            <button
+              key={sample.label}
+              type="button"
+              onClick={() => handleLoadSample(sample)}
+              className="text-[11px] px-2.5 py-1 rounded-full bg-secondary/70 hover:bg-secondary text-foreground border border-border transition-colors cursor-pointer"
+            >
+              {sample.label}
+            </button>
+          ))}
         </div>
 
         {/* User's Filed Cases (if any) */}
         {myCases.length > 0 && (
           <section className="mt-14">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-serif text-2xl font-extrabold text-foreground">
-                  Your Courtroom Dockets
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Cases you filed or joined from this browser
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <h2 className="font-serif text-lg font-bold text-foreground mb-3">
+              Your Cases
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {myCases.map((c) => (
                 <CaseDocketCard key={c.id} caseData={c} />
               ))}
@@ -595,68 +348,40 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Public Court Docket: Recent Verdicts */}
-        <section className="mt-16 sm:mt-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-6 border-b-2 border-double border-border pb-4">
-            <div>
-              <span className="font-mono text-[11px] uppercase tracking-widest text-primary font-bold">
-                Public Court Records
-              </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-foreground">
-                Recent Rulings from the Bench
-              </h2>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Inspect the WhatsApp evidence, fault splits, and judicial remedies—or enter any courtroom to cross-examine.
-            </p>
+        {/* Recent Public Rulings */}
+        <section className="mt-14">
+          <div className="flex items-baseline justify-between mb-4 border-b border-border pb-2">
+            <h2 className="font-serif text-xl font-bold text-foreground">
+              Recent Verdicts
+            </h2>
+            <span className="text-xs text-muted-foreground font-mono">
+              Public Docket
+            </span>
           </div>
 
           {loadingDocket ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[1, 2].map((n) => (
                 <div
                   key={n}
-                  className="h-64 rounded-2xl bg-card border-2 border-border p-6 animate-pulse"
+                  className="h-44 rounded-2xl bg-card border border-border p-5 animate-pulse"
                 />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {publicCases.map((c) => (
-                <CaseDocketCard key={c.id} caseData={c} featured />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {publicCases.slice(0, 6).map((c) => (
+                <CaseDocketCard key={c.id} caseData={c} />
               ))}
             </div>
           )}
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t-2 border-border py-8 px-4 sm:px-6 lg:px-8 bg-card/60 text-xs text-muted-foreground mt-16">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Gavel className="w-4 h-4 text-primary" />
-            <span className="font-serif font-bold text-foreground">
-              THE HONORABLE JUDGE
-            </span>
-            <span>—</span>
-            <span>Settling WhatsApp disputes, group chat drama & real-world crimes</span>
-          </div>
-          <div className="font-mono text-[11px]">
-            Powered by prompt2bot & Alice & Bot • Render Postgres
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
 
-function CaseDocketCard({
-  caseData,
-  featured = false,
-}: {
-  caseData: CaseRecord;
-  featured?: boolean;
-}) {
+function CaseDocketCard({ caseData }: { caseData: CaseRecord }) {
   const hasVerdict = Boolean(caseData.verdictHeadline);
   const faultA = caseData.faultPctA ?? 50;
   const faultB = caseData.faultPctB ?? 50;
@@ -664,104 +389,52 @@ function CaseDocketCard({
   return (
     <Link
       href={`/case/${caseData.id}`}
-      className="group flex flex-col justify-between p-5 sm:p-6 rounded-2xl bg-card border-2 border-border hover:border-primary/60 shadow-2xs hover:shadow-md transition-all"
+      className="group flex flex-col justify-between p-4 sm:p-5 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all"
     >
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-secondary text-foreground border border-border">
-              {caseData.caseNumber}
-            </span>
+          <span className="text-xs font-mono font-bold text-muted-foreground">
+            {caseData.partyAName} v. {caseData.partyBName}
+          </span>
+          {hasVerdict ? (
             <Badge
               variant="outline"
-              className={`font-mono text-[10px] uppercase font-bold ${
-                hasVerdict
-                  ? "bg-primary/10 text-primary border-primary/30"
-                  : "bg-amber-500/10 text-amber-800 border-amber-500/30"
-              }`}
+              className="font-mono text-[10px] bg-primary/10 text-primary border-primary/30"
             >
-              {hasVerdict
-                ? `Winner: ${caseData.verdictWinner}`
-                : "Deliberating"}
+              Winner: {caseData.verdictWinner}
             </Badge>
-          </div>
-
-          <span className="font-mono text-[10px] text-muted-foreground">
-            Code: {caseData.appealCode}
-          </span>
+          ) : (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              Deliberating
+            </Badge>
+          )}
         </div>
 
-        <div>
-          <div className="text-xs font-mono font-bold text-muted-foreground">
-            {caseData.partyAName} v. {caseData.partyBName}
-          </div>
-          <h3 className="font-serif font-extrabold text-lg sm:text-xl text-foreground group-hover:text-primary transition-colors line-clamp-1">
-            {caseData.title}
-          </h3>
-        </div>
+        <h3 className="font-serif font-bold text-base text-foreground group-hover:text-primary transition-colors line-clamp-1">
+          {caseData.title}
+        </h3>
 
-        {hasVerdict ? (
-          <div className="p-3.5 rounded-xl bg-primary/6 border-l-4 border-primary space-y-1">
-            <p className="font-serif font-bold text-sm text-foreground leading-snug line-clamp-2">
-              &ldquo;{caseData.verdictHeadline}&rdquo;
-            </p>
-            {caseData.orderedRemedy && (
-              <p className="text-[11px] text-muted-foreground line-clamp-2">
-                <strong className="text-foreground">Order:</strong>{" "}
-                {caseData.orderedRemedy}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-            {caseData.summary}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+          {hasVerdict ? `"${caseData.verdictHeadline}"` : caseData.summary}
+        </p>
+      </div>
 
-        {featured && caseData.goldenQuote && (
-          <div className="flex items-start gap-2 text-[11px] italic text-muted-foreground bg-secondary/50 px-3 py-2 rounded-lg">
-            <Quote className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-            <span className="line-clamp-2">
-              &ldquo;{caseData.goldenQuote}&rdquo;
+      {hasVerdict && (
+        <div className="pt-3 mt-3 border-t border-border/70 space-y-1.5">
+          <div className="flex justify-between text-[10px] font-mono font-semibold text-muted-foreground">
+            <span>
+              {caseData.partyAName}: {faultA}% fault
+            </span>
+            <span>
+              {caseData.partyBName}: {faultB}% fault
             </span>
           </div>
-        )}
-      </div>
-
-      <div className="pt-4 mt-4 border-t border-border space-y-2.5">
-        {hasVerdict && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] font-mono font-bold">
-              <span className="text-red-700 dark:text-red-400">
-                {caseData.partyAName}: {faultA}% Fault
-              </span>
-              <span className="text-blue-700 dark:text-blue-400">
-                {caseData.partyBName}: {faultB}% Fault
-              </span>
-            </div>
-            <div className="w-full h-2.5 rounded-full overflow-hidden bg-muted flex">
-              <div
-                className="h-full bg-red-600"
-                style={{ width: `${faultA}%` }}
-              />
-              <div
-                className="h-full bg-blue-600"
-                style={{ width: `${faultB}%` }}
-              />
-            </div>
+          <div className="w-full h-1.5 rounded-full overflow-hidden bg-muted flex">
+            <div className="h-full bg-red-600" style={{ width: `${faultA}%` }} />
+            <div className="h-full bg-blue-600" style={{ width: `${faultB}%` }} />
           </div>
-        )}
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-          <span className="font-mono text-[11px]">
-            {caseData.findings.length} findings •{" "}
-            {caseData.parsedMessages.length || 1} chat msgs
-          </span>
-          <span className="text-primary font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-            Enter Courtroom <ArrowRight className="w-3.5 h-3.5" />
-          </span>
         </div>
-      </div>
+      )}
     </Link>
   );
 }

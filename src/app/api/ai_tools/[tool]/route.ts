@@ -251,6 +251,16 @@ export async function POST(
         ? String(toolParams.goldenQuote).trim()
         : targetCase.goldenQuote || null;
 
+      const updatedTitle = toolParams.caseTitle
+        ? String(toolParams.caseTitle).trim()
+        : targetCase.title;
+      const updatedPartyA = toolParams.partyAName
+        ? String(toolParams.partyAName).trim()
+        : targetCase.partyAName;
+      const updatedPartyB = toolParams.partyBName
+        ? String(toolParams.partyBName).trim()
+        : targetCase.partyBName;
+
       const newStatus =
         tool === TOOL_NAMES.AMEND_VERDICT ? "final_verdict" : "verdict_issued";
       const now = Date.now();
@@ -266,8 +276,11 @@ export async function POST(
              ordered_remedy = $7,
              golden_quote = COALESCE($8, golden_quote),
              verdict_issued_at = $9,
-             updated_at = $9
-         WHERE id = $10`,
+             updated_at = $9,
+             title = $10,
+             party_a_name = $11,
+             party_b_name = $12
+         WHERE id = $13`,
         [
           newStatus,
           verdictWinner,
@@ -278,6 +291,9 @@ export async function POST(
           orderedRemedy,
           goldenQuote,
           now,
+          updatedTitle,
+          updatedPartyA,
+          updatedPartyB,
           targetCase.id,
         ]
       );
