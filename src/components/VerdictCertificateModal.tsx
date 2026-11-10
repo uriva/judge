@@ -40,7 +40,7 @@ export function VerdictCertificateModal({
   const caseUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/case/${caseData.id}`
-      : `https://judge-court.onrender.com/case/${caseData.id}`;
+      : `https://judge-khaki-sigma.vercel.app/case/${caseData.id}`;
 
   const handleCopyVerdictLink = () => {
     navigator.clipboard.writeText(caseUrl);

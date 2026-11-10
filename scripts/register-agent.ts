@@ -2,7 +2,7 @@ import { setPrompt, setCustomTools } from "../src/lib/p2b-client";
 import { BASE_JUDGE_PROMPT } from "../src/lib/judge-prompt";
 import { getJudgeTools } from "../src/lib/judge-tools";
 
-const baseUrl = process.env.BASE_URL || "https://judge-court.onrender.com";
+const baseUrl = process.env.BASE_URL || "https://judge-khaki-sigma.vercel.app";
 const apiToken =
   process.env.PROMPT2BOT_API_TOKEN ||
   "p2b_95a4a7fd33ae84a54a2cb205c491675409d6a54a";

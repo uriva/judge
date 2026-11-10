@@ -28,7 +28,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.BASE_URL || "https://judge-court.onrender.com"
+    process.env.BASE_URL || "https://judge-khaki-sigma.vercel.app"
   ),
   title: "THE JUDGE — AI Courtroom for WhatsApp Chats & Real-World Disputes",
   description:
